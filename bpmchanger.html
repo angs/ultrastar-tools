@@ -39,7 +39,7 @@ function recalcLine(str, ratio) {
 
 function recalc(){
 	const lines = document.getElementById("oldtxt").value.split("\n");
-  const oldbpm = lines.filter((x)=>x.startsWith("#BPM"))[0].split(":")[1];
+  const oldbpm = lines.filter((x)=>x.startsWith("#BPM"))[0].split(":")[1].replace(",",".");
 	const newbpm2 = document.getElementById("newbpm").value;
 	const newbpm = document.getElementById("normalize").checked ? normalizeBPM(newbpm2) : newbpm2;
   const newtxt = document.getElementById("newtxt");
