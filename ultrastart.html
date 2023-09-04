@@ -1,0 +1,263 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<title>UltraStar skeleton text file creator for Yass</title>
+<script>
+/*
+ * UltraStar skeleton text file creator
+ * Copyright (C) 2023 Angs
+ *
+ * This program is free software: you can redistribute it and/or modify
+ * it under the terms of the GNU General Public License as published by
+ * the Free Software Foundation, either version 3 of the License, or
+ * (at your option) any later version.
+ *
+ * This program is distributed in the hope that it will be useful,
+ * but WITHOUT ANY WARRANTY; without even the implied warranty of
+ * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+ * GNU General Public License for more details.
+ *
+ * You should have received a copy of the GNU General Public License
+ * along with this program. If not, see <http://www.gnu.org/licenses/>.
+ */
+"use strict";
+
+const clicks = [];
+
+function makeUS() {
+    const lines = document
+                  .getElementById("lyrics")
+                  .value
+                  .replace(/ +/g, " ")
+                  .split("\n")
+                  .map((x) => x.trim())
+                  .filter((x) => x !== "")
+                  .map((x) => x
+                              .replace(/ /g, "\t ")
+                              .split("\t")
+                              .map((x) => x.split("-"))
+                              .flat(1));
+    const boxLen = 3;
+    const boxOffset = 5;
+    const rowOffset = 6;
+    const rowstarts = lines
+                      .map((x) => x.length * boxOffset + rowOffset)
+                      .reduce((a, x) => [...a, a[a.length - 1] + x], [0])
+                      .slice(0, -1);
+    const output = document.getElementById("yass");
+    output.value = "";
+    const tags = [ "title"
+                 , "artist"
+                 , "language"
+                 , "year"
+                 , "genre"
+                 , "creator"
+								 , "mp3"
+								 , "cover"
+								 , "video"
+                 , "bpm"
+                 , "gap"
+								 ];
+    tags.map(function (tag) {
+        const val = document.getElementById(tag).value;
+        output.value +=
+          "\n#"
+          + tag.toUpperCase()
+          + ":"
+          + ((tag === "bpm")
+            ? (parseFloat((parseFloat(document.getElementById("normalize").checked && val !== "" ? normalizeBPM(val) : 0+val)).toFixed(3)))
+            : val);
+    });
+    for (let i = 0; i < lines.length; i+=1) {
+        for (let j = 0; j < lines[i].length; j+=1) {
+            output.value += ( "\n: "
+                            + (rowstarts[i]+boxOffset * j)
+                            + " "
+                            + boxLen
+                            + " 0 "
+                            + lines[i][j]);
+        }
+        if (i < lines.length - 1) {
+            output.value += "\n- " + (rowstarts[i + 1] - 3);
+        }
+    }
+    output.value += "\nE";
+    output.value = output.value.substring(1);
+}
+
+function normalizeBPM(bpm) {
+    return (bpm * (2 ** (0 - Math.floor(Math.log(bpm / 200) / Math.log(2)))));
+}
+
+function init() {
+    document.getElementById("download").onclick = function() {
+        var l = document.createElement("a");
+        l.href = "data:text/plain;charset=UTF-8,"
+               + encodeURIComponent(document.getElementById("yass").value);
+        l.setAttribute( "download"
+                      , document
+                        .getElementById("artist")
+                        .value
+                      + " - "
+                      + document
+                        .getElementById("title")
+                        .value
+                      + ".txt");
+        l.click();
+    };
+    checkCookie();
+}
+
+function setCookie() {
+    const d = new Date();
+    d.setTime(d.getDate() + 600);
+    const name = document.getElementById("creator").value;
+    if (name !== "" && name !== null) {
+        document.cookie
+          = "creator="
+          + document
+            .getElementById("creator")
+            .value
+          + ";expires="
+          + d.toUTCString()
+          + ";path=/";
+    }
+}
+
+function checkCookie() {
+    const creator = decodeURIComponent(document.cookie)
+              .split(";")
+              .map((x) => x.split("="))
+              .filter((x) => x[0].trim() === "creator")[0];
+    if (creator !== [] && creator !== undefined) {
+        document.getElementById("creator").value = creator[1];
+    }
+}
+
+function doFileNames() {
+    const artist = document.getElementById("artist").value;
+    const title = document.getElementById("title").value;
+    const o_mp3 = document.getElementById("mp3");
+    const o_cover = document.getElementById("cover");
+    const o_video = document.getElementById("video");
+		const common = artist + " - " + title + ".";
+		o_mp3.value = common + "mp3";
+		o_cover.value = common + "jpg";
+		o_video.value = common + "webm";
+}
+
+const diff = (A) => { return A.slice(1).map( (item,index) => { return item - A[index]; } );};
+
+function resetCounter() {
+    document.getElementById("bpm").value = "";
+    while (clicks.length > 0) {
+		    clicks.pop();
+		}
+}
+
+function countBPM() {
+ //   clicks.push((new Date()).getTime());
+    clicks.push(performance.now());
+		if (clicks.length > 1) {
+				const deltas = diff(clicks).sort((a,b)=>a-b);
+				const len = deltas.length;
+				if (len % 2 === 1) {
+				    document.getElementById("bpm").value = 60000/deltas[(len-1)/2];
+				} else {
+				    document.getElementById("bpm").value = 120000/(deltas[len/2-1] + deltas[len/2]);
+				}
+		} else {
+				document.getElementById("bpm").value = 60;
+		}
+}
+
+</script>
+
+<style>
+.inputline{
+display: block;
+}
+.inputbox{
+display: inline-block;
+margin-right: 10px;
+padding: 0;
+height: 2em;
+font-size: 1em;
+}
+.tagtext{
+display: inline-block;
+text-align: right;
+width: 100px;
+padding-right: 1em;
+}
+.wrap {
+display: flex;
+}
+.big {
+width:50%;
+height:500px;
+}
+textarea {
+width: 100%;
+height: 100%;
+}
+.onright {
+text-align: left;
+width: auto;
+}
+.big > button {
+height: 2em;
+width: auto;
+}
+#normalize{
+vertical-align: middle;
+padding: 0;
+margin-right: 10px;
+height: 2em;
+width: 2em;
+display: inline;
+margin-left:0;
+}
+#bpm{
+margin-right:0;
+}
+@media (pointer:none), (pointer:coarse) {
+.wrap {
+display: block;
+}
+.big {
+margin-bottom: 100px;
+}
+}
+</style>
+</head>
+<body onload="init()">
+<div class="inputline"><label for="creator" class="tagtext">Creator</label><input type="text" class="inputbox" id="creator" name="creator" onChange="setCookie()" onfocus="" onblur=""></div>
+<hr>
+<div class="inputline"><label for="artist" class="tagtext">Artist</label><input type="text" class="inputbox" id="artist" name="artist" onChange="doFileNames()"></div>
+<div class="inputline"><label for="title" class="tagtext">Title</label><input type="text" class="inputbox" id="title" name="title" onChange="doFileNames()"></div>
+<div class="inputline"><label for="language" class="tagtext">Language</label><input type="text" class="inputbox" id="language" name="language"></div>
+<div class="inputline"><label for="year" class="tagtext">Year</label><input type="number" class="inputbox" id="year" name="year"></div>
+<div class="inputline"><label for="genre" class="tagtext">Genre</label><input type="text" class="inputbox" id="genre" name="genre"></div>
+<div class="inputline"><label for="bpm" class="tagtext">BPM</label><input type="number" class="inputbox" id="bpm" name="bpm"><input type="checkbox" checked id="normalize"><label for="normalize" class="tagtext onright">Normalize</label><button id="clear" onClick="resetCounter()">Reset</button><button id="counter" onClick="countBPM()">Click!</button></div>
+
+<div class="inputline"><label for="gap" class="tagtext">Gap</label><input type="number" class="inputbox" id="gap" name="gap"></div>
+<input type="text" id="mp3" hidden>
+<input type="text" id="cover" hidden>
+<input type="text" id="video" hidden>
+<hr>
+<div class="wrap">
+<div class="big">
+<h2>Hyphenated lyrics</h2>
+<textarea id="lyrics" name="lyrics"></textarea>
+<button onclick="makeUS()">Generate UltraStar text</button>
+</div>
+<div class="big">
+<h2>Preliminary UltraStar .txt file</h2>
+<textarea id="yass" name="yass"></textarea>
+<button id="download">Download</button>
+</div>
+</div>
+</body>
+</html>
+

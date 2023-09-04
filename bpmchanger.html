@@ -1,0 +1,155 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<title>UltraStar arbitrary BPM changer</title>
+<script>
+/*
+ * UltraStar arbitrary BPM changer
+ * Copyright (C) 2023 Angs
+ *
+ * This program is free software: you can redistribute it and/or modify
+ * it under the terms of the GNU General Public License as published by
+ * the Free Software Foundation, either version 3 of the License, or
+ * (at your option) any later version.
+ *
+ * This program is distributed in the hope that it will be useful,
+ * but WITHOUT ANY WARRANTY; without even the implied warranty of
+ * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+ * GNU General Public License for more details.
+ *
+ * You should have received a copy of the GNU General Public License
+ * along with this program. If not, see <http://www.gnu.org/licenses/>.
+ */
+"use strict";
+
+const clicks = [];
+
+const diff = (A) => { return A.slice(1).map( (item,index) => { return item - A[index]; } );};
+
+function normalizeBPM(bpm) {
+    return parseFloat((bpm * (2 ** (0 - Math.floor(Math.log(bpm / 200) / Math.log(2))))).toFixed(3));
+}
+
+function recalcLine(str, ratio) {
+  let elems = str.split(" ");
+  elems[1] = Math.round(elems[1] * ratio);
+	if (str[0] != '-') { elems[2] = Math.max(1,Math.round(elems[2] * ratio));}
+	return elems.join(" ");
+}
+
+function recalc(){
+	const lines = document.getElementById("oldtxt").value.split("\n");
+  const oldbpm = lines.filter((x)=>x.startsWith("#BPM"))[0].split(":")[1];
+	const newbpm2 = document.getElementById("newbpm").value;
+	const newbpm = document.getElementById("normalize").checked ? normalizeBPM(newbpm2) : newbpm2;
+  const newtxt = document.getElementById("newtxt");
+	newtxt.value = "";
+  const ratio = newbpm / oldbpm;
+	const newlines = [];
+	lines.map((x)=> {
+	  if (!x.startsWith("#MEDLEY")) { newlines.push((":*GRF-".includes(x[0])) ? recalcLine(x,ratio) : (x.startsWith("#BPM") ? "#BPM:"+newbpm : x) ); }
+	} );
+	newtxt.value = newlines.join("\n");
+}
+
+function resetCounter() {
+    document.getElementById("newbpm").value = "";
+    while (clicks.length > 0) {
+		    clicks.pop();
+		}
+}
+
+function countBPM() {
+ //   clicks.push((new Date()).getTime());
+    clicks.push(performance.now());
+		if (clicks.length > 1) {
+				const deltas = diff(clicks).sort((a,b)=>a-b);
+				const len = deltas.length;
+				if (len % 2 === 1) {
+				    document.getElementById("newbpm").value = 60000/deltas[(len-1)/2];
+				} else {
+				    document.getElementById("newbpm").value = 120000/(deltas[len/2-1] + deltas[len/2]);
+				}
+		} else {
+				document.getElementById("newbpm").value = 60;
+		}
+}
+
+</script>
+
+<style>
+.inputline{
+display: block;
+}
+.inputbox{
+display: inline-block;
+margin-right: 10px;
+padding: 0;
+height: 2em;
+font-size: 1em;
+}
+.tagtext{
+display: inline-block;
+text-align: right;
+width: 100px;
+padding-right: 1em;
+}
+.wrap {
+display: flex;
+}
+.big {
+width:50%;
+height:500px;
+}
+textarea {
+width: 100%;
+height: 100%;
+}
+.onright {
+text-align: left;
+width: auto;
+}
+.big > button {
+height: 2em;
+width: auto;
+}
+#normalize{
+vertical-align: middle;
+padding: 0;
+margin-right: 10px;
+height: 2em;
+width: 2em;
+display: inline;
+margin-left:0;
+}
+#bpm{
+margin-right:0;
+}
+@media (pointer:none), (pointer:coarse) {
+.wrap {
+display: block;
+}
+.big {
+margin-bottom: 100px;
+}
+}
+</style>
+</head>
+<body>
+<h1>UltraStar .txt arbitrary BPM changer</h1>
+<p>For when dividing or multiplying by 2 just isn't enough. Please note, that this is a lossy transformation, because the new values have to be rounded. Manual inspection with yass is needed afterwards.
+<div class="wrap">
+<div class="big">
+<h2>Old .txt</h2>
+<textarea id="oldtxt"></textarea>
+<div class="inputline"><label for="newbpm" class="tagtext">New BPM</label><input type="number" class="inputbox" id="newbpm" name="bpm"><input type="checkbox" checked id="normalize"><label for="normalize" class="tagtext onright">Normalize</label><button id="clear" onClick="resetCounter()">Reset</button><button id="counter" onClick="countBPM()">Click!</button></div>
+</div>
+<div class="big">
+<h2>New .txt</h2>
+<textarea id="newtxt"></textarea>
+<button id="makenew" onclick="recalc()">Recalculate!</button>
+</div>
+</div>
+</body>
+</html>
+
