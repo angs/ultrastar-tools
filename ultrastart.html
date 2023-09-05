@@ -1,3 +1,4 @@
+
 <!DOCTYPE html>
 <html lang="en">
 <head>
@@ -22,7 +23,64 @@
  */
 "use strict";
 
+const boxLength = 3;
+const boxOffset = 5;
+const lineOffset = 6;
+const quarterbeatMinute = 15000;
+const bpmThreshold = 200;
+const tags = [ "title"
+             , "artist"
+             , "language"
+             , "year"
+             , "genre"
+             , "creator"
+             , "mp3"
+             , "cover"
+             , "video"
+             , "bpm"
+             , "gap"
+             ];
+const green = "#43bc26";
+const yellow = "#fb9c00";
+const red = "#dc0323";
 const clicks = [];
+const linetimes = [];
+
+function getBPM() {
+  const bpm = document.getElementById("bpm").value;
+  return parseFloat((parseFloat(document.getElementById("normalize").checked && bpm !== "" ? normalizeBPM(bpm) : 0+bpm)).toFixed(3));
+}
+
+function calcRowStarts(){
+  return linetimes.slice(1).map((x) => Math.round((x - linetimes[1]) * getBPM() / quarterbeatMinute));
+}
+
+function normalizeBPM(bpm) {
+    return (bpm * (2 ** (0 - Math.floor(Math.log(bpm / bpmThreshold) / Math.log(2)))));
+}
+
+function alignGap() {
+  const gap = parseFloat(document.getElementById("gap").value);
+  const exacto = parseFloat(document.getElementById("aligngap").value);
+  const bpm = getBPM();
+  document.getElementById("gap").value = Math.round(Math.round((gap-exacto)*bpm/quarterbeatMinute)*quarterbeatMinute/bpm) + exacto;
+  gapGoodness();
+}
+
+function gapGoodness() {
+  const gap = parseFloat(document.getElementById("gap").value);
+  const exacto = parseFloat(document.getElementById("aligngap").value);
+  const bpm = getBPM();
+  const goodness = Math.round(((y)=>100-200*y)(((x)=>x>0.5?1-x:x)(Math.abs((bpm*(gap-exacto)/quarterbeatMinute)%1))));
+  document.getElementById("gapgoodness").innerHTML = goodness;
+  if (goodness > 80) { document.getElementById("gapgoodness").style.backgroundColor = green;}
+  else if (goodness > 30) { document.getElementById("gapgoodness").style.backgroundColor = yellow; }
+  else { document.getElementById("gapgoodness").style.backgroundColor = red; }
+}
+
+const diff = (A) => { return A.slice(1).map( (item,index) => { return item - A[index]; } );};
+
+const sleep = time => new Promise(res => setTimeout(res, time));
 
 function makeUS() {
     const lines = document
@@ -37,27 +95,15 @@ function makeUS() {
                               .split("\t")
                               .map((x) => x.split("-"))
                               .flat(1));
-    const boxLen = 3;
-    const boxOffset = 5;
-    const rowOffset = 6;
-    const rowstarts = lines
-                      .map((x) => x.length * boxOffset + rowOffset)
-                      .reduce((a, x) => [...a, a[a.length - 1] + x], [0])
-                      .slice(0, -1);
+    const rowStarts = (document.getElementById("dorecord").checked && linetimes.length == lines.length + 1)
+                      ? calcRowStarts()
+                      : lines
+                        .map((x) => x.length * boxOffset + lineOffset)
+                        .reduce((a, x) => [...a, a[a.length - 1] + x], [0])
+                        .slice(0, -1);
+    console.log(rowStarts);
     const output = document.getElementById("yass");
     output.value = "";
-    const tags = [ "title"
-                 , "artist"
-                 , "language"
-                 , "year"
-                 , "genre"
-                 , "creator"
-								 , "mp3"
-								 , "cover"
-								 , "video"
-                 , "bpm"
-                 , "gap"
-								 ];
     tags.map(function (tag) {
         const val = document.getElementById(tag).value;
         output.value +=
@@ -65,47 +111,24 @@ function makeUS() {
           + tag.toUpperCase()
           + ":"
           + ((tag === "bpm")
-            ? (parseFloat((parseFloat(document.getElementById("normalize").checked && val !== "" ? normalizeBPM(val) : 0+val)).toFixed(3)))
+            ? getBPM()
             : val);
     });
     for (let i = 0; i < lines.length; i+=1) {
         for (let j = 0; j < lines[i].length; j+=1) {
             output.value += ( "\n: "
-                            + (rowstarts[i]+boxOffset * j)
+                            + (rowStarts[i]+boxOffset * j)
                             + " "
-                            + boxLen
+                            + boxLength
                             + " 0 "
                             + lines[i][j]);
         }
         if (i < lines.length - 1) {
-            output.value += "\n- " + (rowstarts[i + 1] - 3);
+            output.value += "\n- " + (rowStarts[i + 1] - 3);
         }
     }
     output.value += "\nE";
     output.value = output.value.substring(1);
-}
-
-function normalizeBPM(bpm) {
-    return (bpm * (2 ** (0 - Math.floor(Math.log(bpm / 200) / Math.log(2)))));
-}
-
-function init() {
-    document.getElementById("download").onclick = function() {
-        var l = document.createElement("a");
-        l.href = "data:text/plain;charset=UTF-8,"
-               + encodeURIComponent(document.getElementById("yass").value);
-        l.setAttribute( "download"
-                      , document
-                        .getElementById("artist")
-                        .value
-                      + " - "
-                      + document
-                        .getElementById("title")
-                        .value
-                      + ".txt");
-        l.click();
-    };
-    checkCookie();
 }
 
 function setCookie() {
@@ -134,48 +157,112 @@ function checkCookie() {
     }
 }
 
-function doFileNames() {
+function updateFileNames() {
     const artist = document.getElementById("artist").value;
     const title = document.getElementById("title").value;
-    const o_mp3 = document.getElementById("mp3");
-    const o_cover = document.getElementById("cover");
-    const o_video = document.getElementById("video");
-		const common = artist + " - " + title + ".";
-		o_mp3.value = common + "mp3";
-		o_cover.value = common + "jpg";
-		o_video.value = common + "webm";
+    const common = artist + " - " + title + ".";
+    document.getElementById("mp3").value   = common + "mp3";
+    document.getElementById("cover").value = common + "jpg";
+    document.getElementById("video").value = common + "webm";
 }
-
-const diff = (A) => { return A.slice(1).map( (item,index) => { return item - A[index]; } );};
 
 function resetCounter() {
     document.getElementById("bpm").value = "";
     while (clicks.length > 0) {
-		    clicks.pop();
-		}
+        clicks.pop();
+    }
+}
+
+function median(arr) {
+  if (arr.length === 0) { throw new Error("median: empty array"); }
+  const len = arr.length
+  const sorted = [...arr].sort((a,b)=>a-b);
+  if (len % 2 === 1) {
+    return arr[(len-1)/2];
+  } else {
+    return 0.5*(arr[len/2-1] + arr[len/2]);
+  }
 }
 
 function countBPM() {
  //   clicks.push((new Date()).getTime());
     clicks.push(performance.now());
-		if (clicks.length > 1) {
-				const deltas = diff(clicks).sort((a,b)=>a-b);
-				const len = deltas.length;
-				if (len % 2 === 1) {
-				    document.getElementById("bpm").value = 60000/deltas[(len-1)/2];
-				} else {
-				    document.getElementById("bpm").value = 120000/(deltas[len/2-1] + deltas[len/2]);
-				}
-		} else {
-				document.getElementById("bpm").value = 60;
-		}
+    if (clicks.length > 1) {
+        const deltas = diff(clicks);
+        document.getElementById("bpm").value = 60000/median(diff(clicks));
+    } else {
+        document.getElementById("bpm").value = 60;
+    }
+}
+
+function lineTimesReset(){
+  const output = document.getElementById("recordoutput");
+  if (document.getElementById("lyrics").value === "") {
+    output.value = "Please insert lyrics first";
+  }
+  else {
+    while (linetimes.length > 0) { linetimes.pop(); }
+    document.getElementById("newline").style.visibility = "visible";
+    output.value = "Starting in 3…";
+    sleep(1000).then(() => output.value += "2…");
+    sleep(2000).then(() => output.value += "1…");
+    sleep(3000).then(() => { output.value += "Press play!\n"; lineTimesNew();});
+  }
+}
+
+function lineTimesNew(){
+  const lines = document
+                .getElementById("lyrics")
+                .value
+                .replace(/ +/g, " ")
+                .split("\n")
+                .map((x) => x.trim())
+                .filter((x) => x !== "");
+  const rowindex = linetimes.length;
+  if (rowindex <= lines.length) { linetimes.push(performance.now()); }
+  if (rowindex >= lines.length){
+    document.getElementById("newline").innerHTML = "All rows done";
+    if (rowindex > 1 && document.getElementById("gap").value === "") {
+      const gap = Math.round(linetimes[1] - linetimes[0]);
+      document.getElementById("recordoutput").value += "Estimated GAP: " + Math.round(linetimes[1]-linetimes[0]);
+      document.getElementById("gap").value = gap;
+    }
+    document.getElementById("recordoutput").value += ("\nDone!");
+    document.getElementById("newline").style.visibility = "hidden";
+  }
+  else {
+    document.getElementById("newline").innerHTML = "L" + (rowindex+1) + ": " + lines[rowindex].replace("-","");
+  }
+}
+
+function toggleRecordControls(){
+  document.getElementById("recctrl").style.display = (document.getElementById("dorecord").checked) ? "block" : "none";
+}
+
+function init() {
+    document.getElementById("download").onclick = function() {
+        var l = document.createElement("a");
+        l.href = "data:text/plain;charset=UTF-8,"
+               + encodeURIComponent(document.getElementById("yass").value);
+        l.setAttribute( "download"
+                      , document
+                        .getElementById("artist")
+                        .value
+                      + " - "
+                      + document
+                        .getElementById("title")
+                        .value
+                      + ".txt");
+        l.click();
+    };
+    checkCookie();
 }
 
 </script>
 
 <style>
 body {
-	background-color: #ddccaa;
+  background-color: #ddccaa;
 }
 .inputline{
 display: block;
@@ -198,11 +285,10 @@ display: flex;
 }
 .big {
 width:50%;
-height:500px;
 }
-textarea {
+#lyrics, #yass {
 width: 100%;
-height: 100%;
+height: 500px;
 }
 .onright {
 text-align: left;
@@ -212,7 +298,7 @@ width: auto;
 height: 2em;
 width: auto;
 }
-#normalize{
+.chek{
 accent-color: #0a7ba0;
 vertical-align: middle;
 padding: 0;
@@ -222,8 +308,90 @@ width: 2em;
 display: inline;
 margin-left:0;
 }
+#recctrl{
+display: none;
+}
+button{
+height: 2em;
+}
 #bpm{
 margin-right:0;
+}
+#linerec{
+display: flex;
+}
+#recordoutput{
+width: 100%;
+}
+#newline {
+width: auto;
+visibility: hidden;
+}
+#gapgoodness {
+font-size: 1em;
+margin-top: -2px;
+display: inline-block;
+height: 2em;
+width: 2em;
+text-align: center;
+vertical-align: middle;
+background-color: #eeeeee;
+border-left: 0;
+border-right: 1px solid black;
+border-top: 1px solid black;
+border-bottom: 1px solid black;
+}
+
+#aligngap{
+padding-right: 0;
+margin-right: 0;
+border: 1px solid black;
+border-right: 0;
+}
+.tooltip {
+  position: relative;
+  display: inline-block;
+  border-bottom: 1px dotted black; /* If you want dots under the hoverable text */
+}
+
+/* Tooltip text */
+.tooltip .tooltiptext {
+  visibility: hidden;
+  width: 240px;
+  background-color: #555;
+  color: #fff;
+  text-align: center;
+  padding: 5px 0;
+  border-radius: 6px;
+
+  /* Position the tooltip text */
+  position: absolute;
+  z-index: 1;
+  bottom: -50%;
+  right: -200%;
+  margin-left: -60px;
+
+  /* Fade in tooltip */
+  opacity: 0;
+  transition: opacity 0.3s;
+}
+
+/* Tooltip arrow */
+.tooltip .tooltiptext::after {
+  content: "";
+  position: absolute;
+  top: 30%;
+  left: -2%;
+  margin-left: -5px;
+  border-width: 5px;
+  border-style: solid;
+  border-color: transparent #555 transparent transparent;
+}
+
+/* Show the tooltip text when you mouse over the tooltip container */
+.tooltip:hover .tooltiptext {
+  visibility: visible;
+  opacity: 1;
 }
 @media (pointer:none), (pointer:coarse) {
 .wrap {
@@ -236,28 +404,35 @@ margin-bottom: 100px;
 </style>
 </head>
 <body onload="init()">
-<div class="inputline"><label for="creator" class="tagtext">Creator</label><input type="text" class="inputbox" id="creator" name="creator" onChange="setCookie()" onfocus="" onblur=""></div>
+<div class="inputline"><label for="creator" class="tagtext tooltip">Creator<span class="tooltiptext">your nickname</span></label><input type="text" class="inputbox" id="creator" name="creator" onChange="setCookie()" onfocus="" onblur=""></div>
 <hr>
-<div class="inputline"><label for="artist" class="tagtext">Artist</label><input type="text" class="inputbox" id="artist" name="artist" onChange="doFileNames()"></div>
-<div class="inputline"><label for="title" class="tagtext">Title</label><input type="text" class="inputbox" id="title" name="title" onChange="doFileNames()"></div>
-<div class="inputline"><label for="language" class="tagtext">Language</label><input type="text" class="inputbox" id="language" name="language"></div>
-<div class="inputline"><label for="year" class="tagtext">Year</label><input type="number" class="inputbox" id="year" name="year"></div>
-<div class="inputline"><label for="genre" class="tagtext">Genre</label><input type="text" class="inputbox" id="genre" name="genre"></div>
-<div class="inputline"><label for="bpm" class="tagtext">BPM</label><input type="number" class="inputbox" id="bpm" name="bpm"><input type="checkbox" checked id="normalize"><label for="normalize" class="tagtext onright">Normalize</label><button id="clear" onClick="resetCounter()">Reset</button><button id="counter" onClick="countBPM()">Click!</button></div>
+<div class="wrap">
+<div class="big">
 
-<div class="inputline"><label for="gap" class="tagtext">Gap</label><input type="number" class="inputbox" id="gap" name="gap"></div>
+<div class="inputline"><label for="artist" class="tagtext tooltip">Artist<span class="tooltiptext">* " / \ &lt; &gt; : | ? are illegal characters.</span></label><input type="text" class="inputbox" id="artist" name="artist" onChange="updateFileNames()"></div>
+<div class="inputline"><label for="title" class="tagtext tooltip">Title<span class="tooltiptext">* " / \ &lt; &gt; : | ? are illegal characters. For TV length opening songs add (TV) at the end</span></label><input type="text" class="inputbox" id="title" name="title" onChange="updateFileNames()"></div>
+<div class="inputline"><label for="language" class="tagtext tooltip">Language<span class="tooltiptext">in English</span></label><input type="text" class="inputbox" id="language" name="language"></div>
+<div class="inputline"><label for="year" class="tagtext tooltip">Year<span class="tooltiptext">First release, single or otherwise</span></label><input type="number" class="inputbox" id="year" name="year"></div>
+<div class="inputline"><label for="genre" class="tagtext tooltip">Genre<span class="tooltiptext">in English</span></label><input type="text" class="inputbox" id="genre" name="genre"></div>
+<div class="inputline"><label for="bpm" class="tagtext tooltip">BPM<span class="tooltiptext">Tempo of the song, this affects the duration of the UltraStar boxes and careful alignment makes synchronization better. Check with Audacity by opening the audio and creating a rhythm track aligned with the first beat.</span></label><input type="number" class="inputbox" id="bpm" name="bpm" onChange="gapGoodness()"><input type="checkbox" class="chek" checked id="normalize"><label for="normalize" class="tagtext onright tooltip">Normalize to 200-400<span class="tooltiptext">Too small BPM→not enough resolution. Too large BPM→harder to work with and worse performance.</span></label><button id="clear" onClick="resetCounter()">Reset</button><button id="counter" onClick="countBPM()">Click to the beat!</button></div>
+<div class="inputline"><label for="gap" class="tagtext tooltip">Gap<span class="tooltiptext">Starting time of first syllable in milliseconds. This marks the horizontal location of the UltraStar grid. The line recording tool can give an estimate. </span></label><input type="number" class="inputbox" id="gap" name="gap" onChange="gapGoodness()"><label for="aligngap" class="tagtext tooltip">Exact beat time<span class="tooltiptext">Silence at start influences grid placement – at worst your grid can be right between the "true grid". Depending on song style good alignment can make the starts of syllables clearer to hear. Gap is the only way to make finer adjustments to the grid location. Use Audacity to get a location of one true beat e.g. bass drum, in milliseconds.</span></label><input type="number" class="inputbox" id="aligngap" onChange="gapGoodness()"><span id="gapgoodness"></span><button id="gapalign" onClick="alignGap()">Align Gap</button></div>
 <input type="text" id="mp3" hidden>
 <input type="text" id="cover" hidden>
 <input type="text" id="video" hidden>
+</div>
+<div class="big">
+<div id="linerec"><input type="checkbox" class="chek" id="dorecord" onClick="toggleRecordControls()"><label class="tagtext">Record line starting times</label><div id="recctrl"><button id="linesreset" onclick="lineTimesReset()">Start/Reset</button><button id="newline" onclick="lineTimesNew()">Line start</button><textarea id="recordoutput" rows="4" readonly>Press start and start playback of your song after countdown, then click the line button once its line starts</textarea></div></div>
+</div>
+</div>
 <hr>
 <div class="wrap">
 <div class="big">
 <h2>Hyphenated lyrics</h2>
-<textarea id="lyrics" name="lyrics"></textarea>
+<textarea id="lyrics" name="lyrics" spellcheck="false"></textarea>
 <button onclick="makeUS()">Generate UltraStar text</button>
 </div>
 <div class="big">
-<h2>Preliminary UltraStar .txt file</h2>
+<h2>Preliminary UltraStar .txt file for Yass</h2>
 <textarea id="yass" name="yass"></textarea>
 <button id="download">Download</button>
 </div>
