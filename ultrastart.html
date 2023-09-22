@@ -28,6 +28,7 @@ const boxOffset = 5;
 const lineOffset = 6;
 const quarterbeatMinute = 15000;
 const bpmThreshold = 200;
+const cookieExpireDays = 600
 const tags = [ "title"
              , "artist"
              , "language"
@@ -133,7 +134,7 @@ function makeUS() {
 
 function setCookie() {
     const d = new Date();
-    d.setTime(d.getDate() + 600);
+    d.setTime(d.getDate() + cookieExpireDays);
     const name = document.getElementById("creator").value;
     if (name !== "" && name !== null) {
         document.cookie
@@ -256,6 +257,21 @@ function init() {
         l.click();
     };
     checkCookie();
+}
+
+function verseCapitalizationScheme(){
+  document.getElementById("lyrics").value 
+	= document
+	.getElementById("lyrics")
+	.value
+	.split("\n\n")
+	.map((x)=>x
+	  .split("\n")
+		.map((y)=>y.split(" "))
+		.map((z)=>(z[0]==="I")? z.join(" ") : [z[0].toLowerCase()].concat(z.slice(1)).join(" "))
+		.join("\n"))
+	.map((x)=>x.charAt(0).toUpperCase() + x.slice(1))
+	.join("\n\n");
 }
 
 </script>
@@ -430,6 +446,7 @@ margin-bottom: 100px;
 <h2>Hyphenated lyrics</h2>
 <textarea id="lyrics" name="lyrics" spellcheck="false"></textarea>
 <button onclick="makeUS()">Generate UltraStar text</button>
+<button onclick="verseCapitalizationScheme()" title="Lowercase every start of line in verses (separated by an empty line) except first line">Verse capitalization</button>
 </div>
 <div class="big">
 <h2>Preliminary UltraStar .txt file for Yass</h2>
